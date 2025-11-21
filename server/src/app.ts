@@ -37,6 +37,7 @@ app.use(
 );
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/', (_req, res) => res.send('bell-system api running'));
 
 app.use('/api', apiRouter);
 
