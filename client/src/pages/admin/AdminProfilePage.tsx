@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { updateProfileRequest, fetchProfileRequest } from '../../services/api';
+import { updateProfileRequest } from '../../services/api';
 import { useAuthStore } from '../../state/useAuthStore';
 
 export const AdminProfilePage = () => {
