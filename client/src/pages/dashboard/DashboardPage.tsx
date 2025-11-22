@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { Topbar } from '../../components/layout/Topbar';
@@ -23,7 +24,7 @@ export const DashboardPage = () => {
     if (!schedules.length || !organisation?.timezone) return '—';
     const tz = organisation.timezone;
     const now = dayjs().tz(tz);
-    let best: dayjs.Dayjs | null = null;
+    let best: Dayjs | null = null;
 
     schedules
       .filter((s) => s.active)
