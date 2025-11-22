@@ -34,6 +34,8 @@ WebSocketsClient wsClient;
 
 String sessionToken;
 int nextBellMinutes = -1;
+unsigned long lastNextUpdate = 0;
+bool socketConnected = false;
 
 // ---------- forward declarations ----------
 String hmacSHA256(String payload);
@@ -45,6 +47,7 @@ void connectWebsocket();
 void sendRegistration();
 void handleWsMessage(const String &message);
 void triggerRelay(int seconds);
+void displayNextBell();
 
 // ---------- setup ----------
 void setup() {
@@ -79,6 +82,16 @@ void setup() {
 
 void loop() {
   wsClient.loop();
+
+  // decrement next bell countdown every minute
+  if (socketConnected && nextBellMinutes > 0) {
+    unsigned long now = millis();
+    if (now - lastNextUpdate >= 60000) {
+      nextBellMinutes = max(0, nextBellMinutes - 1);
+      lastNextUpdate = now;
+      displayNextBell();
+    }
+  }
 }
 
 // ---------- HMAC SHA256 signature ----------
@@ -258,15 +271,11 @@ void requestSession() {
     deserializeJson(response, client.getString());
     sessionToken = response["sessionToken"].as<String>();
     nextBellMinutes = response["nextBell"]["minutes"] | -1;
+    lastNextUpdate = millis();
 
     lcd.clear();
     lcd.print("Server linked");
-    if (nextBellMinutes >= 0) {
-      lcd.setCursor(0, 1);
-      lcd.print("Next in ");
-      lcd.print(nextBellMinutes);
-      lcd.print("m");
-    }
+    displayNextBell();
   } else {
     lcd.clear();
     lcd.print("Auth failed");
@@ -290,18 +299,14 @@ void connectWebsocket() {
   wsClient.onEvent([](WStype_t type, uint8_t *payload, size_t length) {
     switch (type) {
       case WStype_CONNECTED:
+        socketConnected = true;
         lcd.clear();
-        if (nextBellMinutes >= 0) {
-          lcd.print("Next bell in ");
-          lcd.print(nextBellMinutes);
-          lcd.print("m");
-        } else {
-          lcd.print("Socket online");
-        }
+        displayNextBell();
         Serial.println("WS connected");
         break;
 
       case WStype_DISCONNECTED:
+        socketConnected = false;
         lcd.clear();
         lcd.print("Socket closed");
         Serial.println("WS disconnected");
@@ -370,18 +375,14 @@ void handleWsMessage(const String &message) {
     }
 
     if (strcmp(event, "device:ack") == 0) {
-      if (nextBellMinutes >= 0) {
-        lcd.clear();
-        lcd.print("Next bell in ");
-        lcd.print(nextBellMinutes);
-        lcd.print("m");
-      }
+      displayNextBell();
       return;
     }
 
     if (strcmp(event, "ring") == 0) {
       int duration = data["duration"] | 5;
       triggerRelay(duration);
+      requestSession();  // refresh next bell after ring
     } else if (strcmp(event, "emergency_on") == 0) {
       triggerRelay(10);
     }
@@ -432,4 +433,15 @@ void triggerRelay(int seconds) {
 
   lcd.clear();
   lcd.print("Idle");
+}
+
+void displayNextBell() {
+  lcd.clear();
+  if (nextBellMinutes >= 0) {
+    lcd.print("Next bell in ");
+    lcd.print(nextBellMinutes);
+    lcd.print("m");
+  } else {
+    lcd.print(socketConnected ? "Socket online" : "Idle");
+  }
 }
