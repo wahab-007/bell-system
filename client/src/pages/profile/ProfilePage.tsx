@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { Topbar } from '../../components/layout/Topbar';
 import { useAuthStore } from '../../state/useAuthStore';
 import { api } from '../../services/api';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
 
 export const ProfilePage = () => {
   const { user, organisation, setSession, accessToken, refreshToken } = useAuthStore();
@@ -88,12 +89,10 @@ export const ProfilePage = () => {
             onChange={(e) => setOrg((prev) => ({ ...prev, contactPhone: e.target.value }))}
             style={inputStyle}
           />
-          <input
-            placeholder="Timezone"
-            value={org.timezone}
-            onChange={(e) => setOrg((prev) => ({ ...prev, timezone: e.target.value }))}
-            style={inputStyle}
-          />
+          <label>
+            Timezone / Country
+            <TimezoneSelect value={org.timezone} onChange={(tz) => setOrg((prev) => ({ ...prev, timezone: tz }))} />
+          </label>
           <button className="btn btn-primary">Save Organisation</button>
         </form>
       </div>

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../state/useAuthStore';
 
 interface Props {
@@ -20,6 +21,11 @@ export const Topbar = ({ title }: Props) => {
         <h1 style={{ margin: 0 }}>{title}</h1>
       </div>
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        {user?.role === 'superadmin' && (
+          <Link to="/admin" className="btn btn-secondary">
+            Admin Portal
+          </Link>
+        )}
         <span style={{ color: '#475467', fontWeight: 600 }}>{user?.email}</span>
         <button className="btn btn-secondary" onClick={clear}>
           Logout

@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signupRequest } from '../../services/api';
 import { useAuthStore } from '../../state/useAuthStore';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
 
 export const SignupPage = () => {
   const navigate = useNavigate();
@@ -86,10 +87,10 @@ export const SignupPage = () => {
             />
           </label>
           <label>
-            Timezone
-            <input
+            Timezone / Country
+            <TimezoneSelect
               value={form.timezone}
-              onChange={(e) => setForm((prev) => ({ ...prev, timezone: e.target.value }))}
+              onChange={(tz) => setForm((prev) => ({ ...prev, timezone: tz }))}
               style={inputStyle}
             />
           </label>

@@ -5,6 +5,7 @@ import {
   fetchAdminOrganisations,
   updateAdminOrganisation,
 } from '../../services/api';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
 
 export const AdminOrganisationsPage = () => {
   const [orgs, setOrgs] = useState<any[]>([]);
@@ -93,9 +94,9 @@ export const AdminOrganisationsPage = () => {
                     />
                   </td>
                   <td>
-                    <input
-                      value={org.timezone || ''}
-                      onChange={(e) => handleUpdate(org._id, { timezone: e.target.value })}
+                    <TimezoneSelect
+                      value={org.timezone || 'UTC'}
+                      onChange={(tz) => handleUpdate(org._id, { timezone: tz })}
                       style={inputStyle}
                     />
                   </td>
@@ -130,12 +131,7 @@ export const AdminOrganisationsPage = () => {
             onChange={(e) => setForm((p) => ({ ...p, contactPhone: e.target.value }))}
             style={inputStyle}
           />
-          <input
-            placeholder="Timezone"
-            value={form.timezone}
-            onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-            style={inputStyle}
-          />
+          <TimezoneSelect value={form.timezone} onChange={(tz) => setForm((p) => ({ ...p, timezone: tz }))} />
           <button className="btn btn-primary" onClick={handleCreate} disabled={!form.name || !form.contactEmail}>
             Create
           </button>
