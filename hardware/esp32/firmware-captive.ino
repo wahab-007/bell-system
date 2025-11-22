@@ -3,32 +3,40 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
+#include <esp_timer.h>
 #include <LiquidCrystal_I2C.h>
 #include <mbedtls/md.h>
 
-const char *DEVICE_ID = "ESP32-UNIVERSAL-001";
-const char *DEVICE_SECRET = "device-shared-secret";  // must match the portal entry
-const char *SERVER_HOST = "http://127.0.0.1:5000";   // HTTP API base
-const char *SERVER_WS_HOST = "127.0.0.1";            // WebSocket host (no protocol)
-const uint16_t SERVER_WS_PORT = 5000;
+const char *DEVICE_ID = "esp-001";
+const char *DEVICE_SECRET = "espxyz098";            // must match server bell record
+const char *DEVICE_HMAC_SECRET = "39fhs873HJbas92"; // server env DEVICE_HMAC_SECRET
+const char *SERVER_HOST = "https://bell-system-server.onrender.com";  // HTTP API base
+const char *SERVER_WS_HOST = "bell-system-server.onrender.com";       // WebSocket host (no protocol)
+const uint16_t SERVER_WS_PORT = 443;
 const int RELAY_PIN = 25;
 
 // Optional setup button (hold LOW at boot to force portal)
 const int SETUP_BTN = 27;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-WebSocketsClient websocket;
+WebSocketsClient wsClient;
 
 String sessionToken;
+int nextBellMinutes = -1;
+uint64_t nextBellTargetMs = 0;
+int lastShownSeconds = -2;
+bool socketConnected = false;
 
 // ---------- forward declarations ----------
 String hmac(String payload);
 void requestSession();
 void connectWebsocket();
 void onSocketEvent(WStype_t type, uint8_t *payload, size_t length);
+void handleWsMessage(const String &message);
 void sendRegistration();
-void handleMessage(const String &message);
 void triggerRelay(int seconds);
+void displayNextBell();
+int computeRemainingSeconds();
 
 // ---------- WiFiManager callbacks ----------
 void configModeCallback(WiFiManager *wm) {
@@ -100,7 +108,13 @@ void setup() {
 }
 
 void loop() {
-  websocket.loop();
+  wsClient.loop();
+
+  int remainingSec = computeRemainingSeconds();
+  if (remainingSec != lastShownSeconds) {
+    nextBellMinutes = (remainingSec >= 0) ? (remainingSec + 59) / 60 : -1;
+    displayNextBell();
+  }
 }
 
 // ---------- HMAC SHA256 signature ----------
@@ -110,7 +124,7 @@ String hmac(String payload) {
   mbedtls_md_type_t md_type = MBEDTLS_MD_SHA256;
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
-  mbedtls_md_hmac_starts(&ctx, (const unsigned char *)DEVICE_SECRET, strlen(DEVICE_SECRET));
+  mbedtls_md_hmac_starts(&ctx, (const unsigned char *)DEVICE_HMAC_SECRET, strlen(DEVICE_HMAC_SECRET));
   mbedtls_md_hmac_update(&ctx, (const unsigned char *)payload.c_str(), payload.length());
   mbedtls_md_hmac_finish(&ctx, hmacResult);
   mbedtls_md_free(&ctx);
@@ -146,9 +160,20 @@ void requestSession() {
     DynamicJsonDocument response(512);
     deserializeJson(response, client.getString());
     sessionToken = response["sessionToken"].as<String>();
+    nextBellMinutes = response["nextBell"]["minutes"] | -1;
+    if (nextBellMinutes >= 0) {
+      uint64_t nowMs = (uint64_t)esp_timer_get_time() / 1000ULL;
+      nextBellTargetMs = nowMs + (uint64_t)nextBellMinutes * 60000ULL;
+    } else {
+      nextBellTargetMs = 0;
+    }
 
     lcd.clear();
     lcd.print("Server linked");
+    displayNextBell();
+    if (socketConnected) {
+      sendRegistration();
+    }
   } else {
     lcd.clear();
     lcd.print("Auth failed");
@@ -156,58 +181,111 @@ void requestSession() {
   client.end();
 }
 
-// ---------- Websocket ----------
+// ---------- Socket.IO over WebSocketsClient ----------
 void connectWebsocket() {
-  websocket.begin(SERVER_WS_HOST, SERVER_WS_PORT, "/socket.io/?EIO=4&transport=websocket");
-  websocket.onEvent(onSocketEvent);
-  websocket.setReconnectInterval(5000);
+  wsClient.beginSSL(SERVER_WS_HOST, SERVER_WS_PORT, "/socket.io/?EIO=4&transport=websocket");
+  wsClient.setReconnectInterval(5000);
+  wsClient.onEvent(onSocketEvent);
 }
 
 void onSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
-      lcd.clear();
-      lcd.print("Socket online");
-      sendRegistration();
+      socketConnected = true;
+      displayNextBell();
+      Serial.println("WS connected");
       break;
-
-    case WStype_TEXT:
-      handleMessage((char *)payload);
-      break;
-
     case WStype_DISCONNECTED:
+      socketConnected = false;
       lcd.clear();
-      lcd.print("Socket lost");
+      lcd.print("Socket closed");
+      Serial.println("WS disconnected");
+      sessionToken = "";
+      requestSession();
       break;
-
+    case WStype_TEXT: {
+      String msg;
+      for (size_t i = 0; i < length; i++) msg += (char)payload[i];
+      handleWsMessage(msg);
+      break;
+    }
     default:
       break;
   }
 }
 
+void handleWsMessage(const String &message) {
+  if (message.length() == 0) return;
+
+  if (message.startsWith("0")) {
+    wsClient.sendTXT("40");
+    return;
+  }
+
+  if (message.startsWith("40")) {
+    if (sessionToken.length()) sendRegistration();
+    return;
+  }
+
+  if (message == "2") {
+    wsClient.sendTXT("3");
+    return;
+  }
+
+  if (message.startsWith("42")) {
+    String json = message.substring(2);
+    DynamicJsonDocument doc(1024);
+    if (deserializeJson(doc, json)) {
+      Serial.println("Bad WS JSON:");
+      Serial.println(json);
+      return;
+    }
+    const char *event = doc[0] | "";
+    JsonVariantConst data = doc[1];
+    Serial.print("Event: ");
+    Serial.println(event);
+
+    if (strcmp(event, "device:error") == 0) {
+      const char *msg = data["message"] | "";
+      Serial.print("Device error: ");
+      Serial.println(msg);
+      sessionToken = "";
+      requestSession();
+      return;
+    }
+
+    if (strcmp(event, "device:ack") == 0) {
+      displayNextBell();
+      return;
+    }
+
+    if (strcmp(event, "ring") == 0) {
+      int duration = data["duration"] | 5;
+      triggerRelay(duration);
+      requestSession();
+    } else if (strcmp(event, "emergency_on") == 0) {
+      triggerRelay(10);
+      requestSession();
+    }
+    return;
+  }
+
+  Serial.print("WS frame: ");
+  Serial.println(message);
+}
+
 void sendRegistration() {
+  if (sessionToken.length() == 0) return;
+
   DynamicJsonDocument doc(256);
-  doc["event"] = "device:register";
-  doc["data"]["sessionToken"] = sessionToken;
+  JsonArray arr = doc.to<JsonArray>();
+  arr.add("device:register");
+  JsonObject data = arr.createNestedObject();
+  data["sessionToken"] = sessionToken;
 
   String message;
   serializeJson(doc, message);
-  websocket.sendTXT(message);
-}
-
-// ---------- Handle messages ----------
-void handleMessage(const String &message) {
-  DynamicJsonDocument doc(512);
-  deserializeJson(doc, message);
-  const char *event = doc["event"];
-
-  if (strcmp(event, "ring") == 0) {
-    int duration = doc["data"]["duration"] | 5;
-    triggerRelay(duration);
-  }
-  else if (strcmp(event, "emergency_on") == 0) {
-    triggerRelay(10);
-  }
+  wsClient.sendTXT("42" + message);
 }
 
 // ---------- Relay trigger ----------
@@ -223,4 +301,33 @@ void triggerRelay(int seconds) {
 
   lcd.clear();
   lcd.print("Idle");
+}
+
+void displayNextBell() {
+  lcd.clear();
+  int remainingSec = computeRemainingSeconds();
+  if (remainingSec > 0) {
+    int mins = remainingSec / 60;
+    int secs = remainingSec % 60;
+    lcd.print("Next in ");
+    lcd.print(mins);
+    lcd.print("m ");
+    if (secs < 10) lcd.print("0");
+    lcd.print(secs);
+    lastShownSeconds = remainingSec;
+  } else if (remainingSec == 0) {
+    lcd.print("Next in 0m 00");
+    lastShownSeconds = 0;
+  } else {
+    lcd.print(socketConnected ? "Socket online" : "Idle");
+    lastShownSeconds = -1;
+  }
+}
+
+int computeRemainingSeconds() {
+  if (nextBellTargetMs == 0) return -1;
+  uint64_t now = (uint64_t)esp_timer_get_time() / 1000ULL;
+  uint64_t remainingMs = (nextBellTargetMs > now) ? (nextBellTargetMs - now) : 0;
+  if (remainingMs == 0) return 0;
+  return (int)((remainingMs + 999ULL) / 1000ULL);
 }

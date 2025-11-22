@@ -3,6 +3,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
+#include <esp_timer.h>
 #include <LiquidCrystal_I2C.h>
 #include <mbedtls/md.h>
 #include <mbedtls/aes.h>
@@ -34,7 +35,8 @@ WebSocketsClient wsClient;
 
 String sessionToken;
 int nextBellMinutes = -1;
-unsigned long lastNextUpdate = 0;
+uint64_t nextBellTargetMs = 0;
+int lastShownSeconds = -2;
 bool socketConnected = false;
 
 // ---------- forward declarations ----------
@@ -48,6 +50,7 @@ void sendRegistration();
 void handleWsMessage(const String &message);
 void triggerRelay(int seconds);
 void displayNextBell();
+int computeRemainingSeconds();
 
 // ---------- setup ----------
 void setup() {
@@ -83,14 +86,11 @@ void setup() {
 void loop() {
   wsClient.loop();
 
-  // decrement next bell countdown every minute
-  if (socketConnected && nextBellMinutes > 0) {
-    unsigned long now = millis();
-    if (now - lastNextUpdate >= 60000) {
-      nextBellMinutes = max(0, nextBellMinutes - 1);
-      lastNextUpdate = now;
-      displayNextBell();
-    }
+  // update countdown display when remaining seconds change
+  int remainingSec = computeRemainingSeconds();
+  if (remainingSec != lastShownSeconds) {
+    nextBellMinutes = (remainingSec >= 0) ? (remainingSec + 59) / 60 : -1;  // ceil to minutes
+    displayNextBell();
   }
 }
 
@@ -271,11 +271,20 @@ void requestSession() {
     deserializeJson(response, client.getString());
     sessionToken = response["sessionToken"].as<String>();
     nextBellMinutes = response["nextBell"]["minutes"] | -1;
-    lastNextUpdate = millis();
+    if (nextBellMinutes >= 0) {
+      uint64_t nowMs = (uint64_t)esp_timer_get_time() / 1000ULL;
+      nextBellTargetMs = nowMs + (uint64_t)nextBellMinutes * 60000ULL;
+    } else {
+      nextBellTargetMs = 0;
+    }
 
     lcd.clear();
     lcd.print("Server linked");
     displayNextBell();
+    // if socket is already up, re-register with fresh session token
+    if (socketConnected) {
+      sendRegistration();
+    }
   } else {
     lcd.clear();
     lcd.print("Auth failed");
@@ -374,19 +383,20 @@ void handleWsMessage(const String &message) {
       return;
     }
 
-    if (strcmp(event, "device:ack") == 0) {
-      displayNextBell();
-      return;
-    }
+      if (strcmp(event, "device:ack") == 0) {
+        displayNextBell();
+        return;
+      }
 
-    if (strcmp(event, "ring") == 0) {
-      int duration = data["duration"] | 5;
-      triggerRelay(duration);
-      requestSession();  // refresh next bell after ring
-    } else if (strcmp(event, "emergency_on") == 0) {
-      triggerRelay(10);
-    }
-    return;
+      if (strcmp(event, "ring") == 0) {
+        int duration = data["duration"] | 5;
+        triggerRelay(duration);
+        requestSession();  // refresh next bell after ring
+      } else if (strcmp(event, "emergency_on") == 0) {
+        triggerRelay(10);
+        requestSession();  // refresh after emergency
+      }
+      return;
   }
 
   // Unknown frame
@@ -437,11 +447,29 @@ void triggerRelay(int seconds) {
 
 void displayNextBell() {
   lcd.clear();
-  if (nextBellMinutes >= 0) {
-    lcd.print("Next bell in ");
-    lcd.print(nextBellMinutes);
-    lcd.print("m");
+  int remainingSec = computeRemainingSeconds();
+  if (remainingSec > 0) {
+    int mins = remainingSec / 60;
+    int secs = remainingSec % 60;
+    lcd.print("Next in ");
+    lcd.print(mins);
+    lcd.print("m ");
+    if (secs < 10) lcd.print("0");
+    lcd.print(secs);
+    lastShownSeconds = remainingSec;
+  } else if (remainingSec == 0) {
+    lcd.print("Next in 0m 00");
+    lastShownSeconds = 0;
   } else {
     lcd.print(socketConnected ? "Socket online" : "Idle");
+    lastShownSeconds = -1;
   }
+}
+
+int computeRemainingSeconds() {
+  if (nextBellTargetMs == 0) return -1;
+  uint64_t now = (uint64_t)esp_timer_get_time() / 1000ULL;
+  uint64_t remainingMs = (nextBellTargetMs > now) ? (nextBellTargetMs - now) : 0;
+  if (remainingMs == 0) return 0;
+  return (int)((remainingMs + 999ULL) / 1000ULL);  // ceil to seconds
 }
