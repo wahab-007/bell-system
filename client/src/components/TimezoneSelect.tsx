@@ -7,6 +7,7 @@ const fallbackZones = [
   'Europe/Berlin',
   'Asia/Dubai',
   'Asia/Kolkata',
+  'Asia/Karachi',
   'Asia/Bangkok',
   'Asia/Shanghai',
   'Asia/Tokyo',
