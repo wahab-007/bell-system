@@ -20,11 +20,11 @@ export const DashboardPage = () => {
   const { data: schedules = [] } = useFetch(fetchSchedules, []);
   const organisation = useAuthStore((s) => s.organisation);
 
-  const nextBell = useMemo(() => {
-    if (!schedules.length || !organisation?.timezone) return '—';
+  const nextBell = useMemo<string>(() => {
+    if (!schedules.length || !organisation?.timezone) return '--';
     const tz = organisation.timezone;
     const now = dayjs().tz(tz);
-    let best: Dayjs | null = null;
+    let best: Dayjs | undefined;
 
     schedules
       .filter((s) => s.active)
@@ -46,7 +46,8 @@ export const DashboardPage = () => {
         }
       });
 
-    return best ? best.format('ddd HH:mm') : '—';
+    if (!best) return '--';
+    return best.format('ddd HH:mm');
   }, [organisation?.timezone, schedules]);
 
   return (
