@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Topbar } from '../../components/layout/Topbar';
 import { useFetch } from '../../hooks/useFetch';
 import {
@@ -19,16 +19,8 @@ export const BulbsPage = () => {
   const { data: blocks = [] } = useFetch(fetchBlocks, []);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const dayMap: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const toDayNames = (days?: number[]) =>
     (days ?? []).map((d) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d] || String(d)).join(', ');
-  const parseDays = (value: string) =>
-    value
-      .split(',')
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean)
-      .map((entry) => dayMap[entry] ?? Number(entry))
-      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
 
   const dayOptions = [
     { label: 'Sun', value: 0 },
@@ -164,7 +156,6 @@ export const BulbsPage = () => {
                       onUpdateSchedule={handleUpdateSchedule}
                       onDeleteSchedule={handleDeleteSchedule}
                       toDayNames={toDayNames}
-                      parseDays={parseDays}
                       dayOptions={dayOptions}
                     />
                   ))}
@@ -186,7 +177,6 @@ const BulbCard = ({
   onUpdateSchedule,
   onDeleteSchedule,
   toDayNames,
-  parseDays,
   dayOptions,
 }: {
   bulb: Bulb;
@@ -255,9 +245,9 @@ const BulbCard = ({
           >
             <div>
               <strong>
-                {s.onTime} → {s.offTime}
+                {s.onTime} -> {s.offTime}
               </strong>
-              <div style={{ color: '#667085', fontSize: 12 }}>Days: {toDayNames(s.repeatPattern?.daysOfWeek) || '—'}</div>
+              <div style={{ color: '#667085', fontSize: 12 }}>Days: {toDayNames(s.repeatPattern?.daysOfWeek) || '-'}</div>
             </div>
             <div style={{ display: 'flex', gap: '.35rem' }}>
               <button className="btn" disabled={savingId === s._id} onClick={() => onUpdateSchedule(s._id, { active: !s.active })}>
@@ -318,3 +308,5 @@ const BulbCard = ({
     </div>
   );
 };
+
+
