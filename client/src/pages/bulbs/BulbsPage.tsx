@@ -268,50 +268,29 @@ const BulbCard = ({
           </div>
         ))}
         <div style={{ display: 'grid', gap: '.35rem', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginTop: '.35rem' }}>
-          <input value={onTime} onChange={(e) => setOnTime(e.target.value)} placeholder="On HH:MM" />
-          <input value={offTime} onChange={(e) => setOffTime(e.target.value)} placeholder="Off HH:MM" />
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+            <span style={{ color: '#667085', fontSize: 12 }}>On time</span>
+            <input type="time" value={onTime} onChange={(e) => setOnTime(e.target.value)} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+            <span style={{ color: '#667085', fontSize: 12 }}>Off time</span>
+            <input type="time" value={offTime} onChange={(e) => setOffTime(e.target.value)} />
+          </label>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
-          <button
-            type="button"
-            className="btn"
-            style={{ padding: '.35rem .6rem' }}
-            onClick={selectAll}
-            disabled={selectedDays.size === dayOptions.length}
-          >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', alignItems: 'center' }}>
+          <span style={{ color: '#667085', fontSize: 12 }}>Days</span>
+          <button type="button" className="btn" onClick={selectAll} disabled={selectedDays.size === dayOptions.length}>
             All
           </button>
-          <button
-            type="button"
-            className="btn"
-            style={{ padding: '.35rem .6rem' }}
-            onClick={clearAll}
-            disabled={selectedDays.size === 0}
-          >
+          <button type="button" className="btn" onClick={clearAll} disabled={selectedDays.size === 0}>
             None
           </button>
-          {dayOptions.map((d) => {
-            const active = selectedDays.has(d.value);
-            return (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => {
-                  toggleDay(d.value);
-                }}
-                style={{
-                  padding: '.35rem .55rem',
-                  borderRadius: 20,
-                  border: '1px solid #d0d5dd',
-                  background: active ? '#e0f2fe' : '#fff',
-                  color: active ? '#075985' : '#344054',
-                  fontWeight: 600,
-                }}
-              >
-                {d.label}
-              </button>
-            );
-          })}
+          {dayOptions.map((d) => (
+            <label key={d.value} style={{ display: 'flex', alignItems: 'center', gap: '.25rem', padding: '.2rem .4rem' }}>
+              <input type="checkbox" checked={selectedDays.has(d.value)} onChange={() => toggleDay(d.value)} />
+              <span>{d.label}</span>
+            </label>
+          ))}
         </div>
         <button
           className="btn btn-primary"
