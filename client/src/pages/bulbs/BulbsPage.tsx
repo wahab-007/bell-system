@@ -198,13 +198,11 @@ const BulbCard = ({
   onUpdateSchedule: (scheduleId: string, payload: Partial<{ active: boolean }>) => Promise<void>;
   onDeleteSchedule: (scheduleId: string) => Promise<void>;
   toDayNames: (days?: number[]) => string;
-  parseDays: (value: string) => number[];
   dayOptions: { label: string; value: number }[];
 }) => {
   const [label, setLabel] = useState(bulb.label);
   const [onTime, setOnTime] = useState('07:00');
   const [offTime, setOffTime] = useState('18:00');
-  const [days, setDays] = useState('mon,tue,wed,thu,fri');
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
 
   return (
@@ -287,7 +285,6 @@ const BulbCard = ({
                   if (next.has(d.value)) next.delete(d.value);
                   else next.add(d.value);
                   setSelectedDays(next);
-                  setDays(Array.from(next).sort().map((v) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][v]).join(','));
                 }}
                 style={{
                   padding: '.35rem .55rem',
