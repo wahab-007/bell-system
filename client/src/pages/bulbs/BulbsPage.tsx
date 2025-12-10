@@ -30,6 +30,16 @@ export const BulbsPage = () => {
       .map((entry) => dayMap[entry] ?? Number(entry))
       .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
 
+  const dayOptions = [
+    { label: 'Sun', value: 0 },
+    { label: 'Mon', value: 1 },
+    { label: 'Tue', value: 2 },
+    { label: 'Wed', value: 3 },
+    { label: 'Thu', value: 4 },
+    { label: 'Fri', value: 5 },
+    { label: 'Sat', value: 6 },
+  ];
+
   const grouped = useMemo(() => {
     const map: Record<string, { block?: Block; bulbs: Bulb[]; schedules: Record<string, BulbSchedule[]> }> = {};
     bulbs.forEach((bulb) => {
@@ -155,6 +165,7 @@ export const BulbsPage = () => {
                       onDeleteSchedule={handleDeleteSchedule}
                       toDayNames={toDayNames}
                       parseDays={parseDays}
+                      dayOptions={dayOptions}
                     />
                   ))}
               </div>
@@ -176,6 +187,7 @@ const BulbCard = ({
   onDeleteSchedule,
   toDayNames,
   parseDays,
+  dayOptions,
 }: {
   bulb: Bulb;
   schedules: BulbSchedule[];
@@ -187,11 +199,13 @@ const BulbCard = ({
   onDeleteSchedule: (scheduleId: string) => Promise<void>;
   toDayNames: (days?: number[]) => string;
   parseDays: (value: string) => number[];
+  dayOptions: { label: string; value: number }[];
 }) => {
   const [label, setLabel] = useState(bulb.label);
   const [onTime, setOnTime] = useState('07:00');
   const [offTime, setOffTime] = useState('18:00');
   const [days, setDays] = useState('mon,tue,wed,thu,fri');
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
 
   return (
     <div style={{ border: '1px solid #e4e7ec', borderRadius: 12, padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -260,7 +274,34 @@ const BulbCard = ({
         <div style={{ display: 'grid', gap: '.35rem', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginTop: '.35rem' }}>
           <input value={onTime} onChange={(e) => setOnTime(e.target.value)} placeholder="On HH:MM" />
           <input value={offTime} onChange={(e) => setOffTime(e.target.value)} placeholder="Off HH:MM" />
-          <input value={days} onChange={(e) => setDays(e.target.value)} placeholder="Days e.g. 1,2,3" />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
+          {dayOptions.map((d) => {
+            const active = selectedDays.has(d.value);
+            return (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => {
+                  const next = new Set(selectedDays);
+                  if (next.has(d.value)) next.delete(d.value);
+                  else next.add(d.value);
+                  setSelectedDays(next);
+                  setDays(Array.from(next).sort().map((v) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][v]).join(','));
+                }}
+                style={{
+                  padding: '.35rem .55rem',
+                  borderRadius: 20,
+                  border: '1px solid #d0d5dd',
+                  background: active ? '#e0f2fe' : '#fff',
+                  color: active ? '#075985' : '#344054',
+                  fontWeight: 600,
+                }}
+              >
+                {d.label}
+              </button>
+            );
+          })}
         </div>
         <button
           className="btn btn-primary"
@@ -270,7 +311,7 @@ const BulbCard = ({
             onCreateSchedule(bulb._id, {
               onTime,
               offTime,
-              daysOfWeek: parseDays(days),
+              daysOfWeek: Array.from(selectedDays.values()).sort(),
             })
           }
         >
