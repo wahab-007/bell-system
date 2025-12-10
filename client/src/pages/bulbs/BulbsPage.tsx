@@ -195,6 +195,16 @@ const BulbCard = ({
   const [offTime, setOffTime] = useState('18:00');
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
 
+  const toggleDay = (value: number) => {
+    const next = new Set(selectedDays);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setSelectedDays(next);
+  };
+
+  const selectAll = () => setSelectedDays(new Set(dayOptions.map((d) => d.value)));
+  const clearAll = () => setSelectedDays(new Set());
+
   return (
     <div style={{ border: '1px solid #e4e7ec', borderRadius: 12, padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem' }}>
@@ -262,6 +272,24 @@ const BulbCard = ({
           <input value={offTime} onChange={(e) => setOffTime(e.target.value)} placeholder="Off HH:MM" />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: '.35rem .6rem' }}
+            onClick={selectAll}
+            disabled={selectedDays.size === dayOptions.length}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: '.35rem .6rem' }}
+            onClick={clearAll}
+            disabled={selectedDays.size === 0}
+          >
+            None
+          </button>
           {dayOptions.map((d) => {
             const active = selectedDays.has(d.value);
             return (
@@ -269,10 +297,7 @@ const BulbCard = ({
                 key={d.value}
                 type="button"
                 onClick={() => {
-                  const next = new Set(selectedDays);
-                  if (next.has(d.value)) next.delete(d.value);
-                  else next.add(d.value);
-                  setSelectedDays(next);
+                  toggleDay(d.value);
                 }}
                 style={{
                   padding: '.35rem .55rem',
