@@ -244,9 +244,7 @@ const BulbCard = ({
             }}
           >
             <div>
-              <strong>
-                {s.onTime} -> {s.offTime}
-              </strong>
+              <strong>{`${s.onTime} -> ${s.offTime}`}</strong>
               <div style={{ color: '#667085', fontSize: 12 }}>Days: {toDayNames(s.repeatPattern?.daysOfWeek) || '-'}</div>
             </div>
             <div style={{ display: 'flex', gap: '.35rem' }}>
