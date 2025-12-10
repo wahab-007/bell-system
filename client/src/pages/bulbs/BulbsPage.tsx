@@ -109,7 +109,7 @@ export const BulbsPage = () => {
   return (
     <>
       <Topbar title="Bulbs" />
-      {actionError && <p style={{ color: '#d92d20' }}>{actionError}</p>}
+      {(actionError || error) && <p style={{ color: '#d92d20' }}>{actionError || error}</p>}
       <div
         style={{
           display: 'grid',
