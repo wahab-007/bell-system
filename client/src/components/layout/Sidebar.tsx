@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const links = [
   { to: '/dashboard', label: 'Analytics' },
   { to: '/blocks', label: 'Blocks' },
+  { to: '/bulbs', label: 'Bulbs' },
   { to: '/bells', label: 'Bells' },
   { to: '/schedules', label: 'Manage Bells' },
   { to: '/emergency', label: 'Emergency' },
@@ -13,14 +14,16 @@ export const Sidebar = () => {
   return (
     <aside
       style={{
-        width: 240,
+        width: 'min(260px, 32vw)',
         background: '#101828',
         color: 'white',
         display: 'flex',
         flexDirection: 'column',
-        padding: '1.5rem 1rem',
+        padding: '1.25rem 1rem',
         gap: '1rem',
         minHeight: '100vh',
+        position: 'sticky',
+        top: 0,
       }}
     >
       <div>

@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { BlocksPage } from './pages/blocks/BlocksPage';
 import { BellsPage } from './pages/bells/BellsPage';
 import { SchedulesPage } from './pages/schedules/SchedulesPage';
+import { BulbsPage } from './pages/bulbs/BulbsPage';
 import { EmergencyPage } from './pages/emergency/EmergencyPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { useIsAuthenticated } from './state/useAuthStore';
@@ -53,6 +54,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="blocks" element={<BlocksPage />} />
+        <Route path="bulbs" element={<BulbsPage />} />
         <Route path="bells" element={<BellsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
         <Route path="emergency" element={<EmergencyPage />} />
