@@ -12,10 +12,13 @@ const char *DEVICE_ID = "ESP32-UNIVERSAL-001";
 const char *SERVER_HOST = "http://192.168.1.5:5000";
 const char *DEVICE_SECRET = "device-shared-secret";
 const int RELAY_PIN = 25;
+const int BULB_PINS[4] = {26, 27, 14, 12};
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Preferences preferences;
 WebSocketsClient websocket;
+
+void setBulbChannel(int channel, bool state);
 
 String wifiSsid;
 String wifiPassword;
@@ -26,6 +29,11 @@ void setup()
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  for (int i = 0; i < 4; i++)
+  {
+    pinMode(BULB_PINS[i], OUTPUT);
+    digitalWrite(BULB_PINS[i], LOW);
+  }
 
   lcd.init();
   lcd.backlight();
@@ -175,6 +183,12 @@ void handleMessage(const String &message)
     int duration = doc["data"]["duration"] | 5;
     triggerRelay(duration);
   }
+  else if (strcmp(event, "bulb:set") == 0)
+  {
+    int channel = doc["data"]["channel"] | 1;
+    bool state = doc["data"]["state"] | false;
+    setBulbChannel(channel, state);
+  }
   else if (strcmp(event, "emergency_on") == 0)
   {
     triggerRelay(10);
@@ -192,4 +206,18 @@ void triggerRelay(int seconds)
   digitalWrite(RELAY_PIN, LOW);
   lcd.clear();
   lcd.print("Idle");
+}
+
+void setBulbChannel(int channel, bool state)
+{
+  if (channel < 1 || channel > 4)
+  {
+    return;
+  }
+  int pin = BULB_PINS[channel - 1];
+  digitalWrite(pin, state ? HIGH : LOW);
+  lcd.clear();
+  lcd.print("Bulb ");
+  lcd.print(channel);
+  lcd.print(state ? " ON" : " OFF");
 }

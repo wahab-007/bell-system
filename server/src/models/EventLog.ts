@@ -1,6 +1,14 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export type EventType = 'bell_trigger' | 'emergency' | 'device_online' | 'device_offline' | 'error';
+export type EventType =
+  | 'bell_trigger'
+  | 'emergency'
+  | 'device_online'
+  | 'device_offline'
+  | 'error'
+  | 'bulb_on'
+  | 'bulb_off'
+  | 'bulb_toggle';
 
 export interface IEventLog extends Document {
   organisation: mongoose.Types.ObjectId;

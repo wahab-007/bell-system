@@ -4,6 +4,7 @@ import { BellModel } from '../models/Bell';
 import { AuthRequest } from '../middleware/auth';
 import { blockSchema } from '../validators/blockValidators';
 import { HttpError } from '../middleware/errorHandler';
+import { cleanupBulbDataForBlock, ensureBlockBulbs } from '../services/bulbControlService';
 
 export const listBlocks = async (req: AuthRequest, res: Response) => {
   const blocks = await BlockModel.find({ organisation: req.user!.organisationId });
@@ -16,6 +17,7 @@ export const createBlock = async (req: AuthRequest, res: Response) => {
     organisation: req.user!.organisationId,
     ...data,
   });
+  await ensureBlockBulbs(req.user!.organisationId, block._id.toString());
   res.status(201).json(block);
 };
 
@@ -35,6 +37,7 @@ export const deleteBlock = async (req: AuthRequest, res: Response) => {
   if (inUse) {
     throw new HttpError(400, 'Cannot delete block while bells are assigned. Delete bell timings and bells first.');
   }
+  await cleanupBulbDataForBlock(req.user!.organisationId, req.params.id);
   await BlockModel.deleteOne({ _id: req.params.id, organisation: req.user!.organisationId });
   res.status(204).end();
 };

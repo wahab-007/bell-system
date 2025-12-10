@@ -14,6 +14,7 @@ const char *SERVER_HOST = "https://bell-system-server.onrender.com";  // HTTP AP
 const char *SERVER_WS_HOST = "bell-system-server.onrender.com";       // WebSocket host (no protocol)
 const uint16_t SERVER_WS_PORT = 443;
 const int RELAY_PIN = 25;
+const int BULB_PINS[4] = {26, 27, 14, 12};
 
 // Optional setup button (hold LOW at boot to force portal)
 const int SETUP_BTN = 27;
@@ -35,6 +36,7 @@ void onSocketEvent(WStype_t type, uint8_t *payload, size_t length);
 void handleWsMessage(const String &message);
 void sendRegistration();
 void triggerRelay(int seconds);
+void setBulbChannel(int channel, bool state);
 void displayNextBell();
 int computeRemainingSeconds();
 
@@ -58,6 +60,10 @@ void setup() {
 
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  for (int i = 0; i < 4; i++) {
+    pinMode(BULB_PINS[i], OUTPUT);
+    digitalWrite(BULB_PINS[i], LOW);
+  }
 
   pinMode(SETUP_BTN, INPUT_PULLUP);
 
@@ -266,6 +272,10 @@ void handleWsMessage(const String &message) {
     } else if (strcmp(event, "emergency_on") == 0) {
       triggerRelay(10);
       requestSession();
+    } else if (strcmp(event, "bulb:set") == 0) {
+      int channel = data["channel"] | 1;
+      bool state = data["state"] | false;
+      setBulbChannel(channel, state);
     }
     return;
   }
@@ -301,6 +311,16 @@ void triggerRelay(int seconds) {
 
   lcd.clear();
   lcd.print("Idle");
+}
+
+void setBulbChannel(int channel, bool state) {
+  if (channel < 1 || channel > 4) return;
+  int pin = BULB_PINS[channel - 1];
+  digitalWrite(pin, state ? HIGH : LOW);
+  lcd.clear();
+  lcd.print("Bulb ");
+  lcd.print(channel);
+  lcd.print(state ? " ON" : " OFF");
 }
 
 void displayNextBell() {

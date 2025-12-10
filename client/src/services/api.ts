@@ -1,6 +1,16 @@
 import axios from 'axios';
 import { useAuthStore } from '../state/useAuthStore';
-import type { AuthUser, Organisation, Block, Bell, Schedule, EmergencyState, EventLog } from '../types/api';
+import type {
+  AuthUser,
+  Organisation,
+  Block,
+  Bell,
+  Schedule,
+  EmergencyState,
+  EventLog,
+  Bulb,
+  BulbSchedule,
+} from '../types/api';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -56,6 +66,22 @@ export const fetchBlocks = () => api.get<Block[]>('/blocks');
 export const createBlockRequest = (payload: { name: string; description?: string }) =>
   api.post<Block>('/blocks', payload);
 export const deleteBlockRequest = (id: string) => api.delete(`/blocks/${id}`);
+
+export const fetchBulbs = () => api.get<Bulb[]>('/bulbs');
+export const updateBulbRequest = (id: string, payload: { label?: string }) => api.put<Bulb>(`/bulbs/${id}`, payload);
+export const toggleBulbRequest = (id: string, state: boolean) => api.post<Bulb>(`/bulbs/${id}/toggle`, { state });
+
+export const fetchBulbSchedules = () => api.get<BulbSchedule[]>('/bulb-schedules');
+export const createBulbScheduleRequest = (payload: {
+  bulbId: string;
+  onTime: string;
+  offTime: string;
+  daysOfWeek: number[];
+  active?: boolean;
+}) => api.post<BulbSchedule>('/bulb-schedules', payload);
+export const updateBulbScheduleRequest = (id: string, payload: Partial<{ onTime: string; offTime: string; daysOfWeek: number[]; active: boolean }>) =>
+  api.put<BulbSchedule>(`/bulb-schedules/${id}`, payload);
+export const deleteBulbScheduleRequest = (id: string) => api.delete(`/bulb-schedules/${id}`);
 
 export const fetchBells = () => api.get<Bell[]>('/bells');
 export const createBellRequest = (payload: { label: string; blockId: string; deviceId: string; deviceSecret: string }) =>

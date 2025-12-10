@@ -19,6 +19,15 @@ export interface Block {
   description?: string;
 }
 
+export interface Bulb {
+  _id: string;
+  block: Block | string;
+  channel: number;
+  label: string;
+  state: boolean;
+  lastToggledAt?: string;
+}
+
 export interface Bell {
   _id: string;
   label: string;
@@ -26,6 +35,19 @@ export interface Bell {
   deviceId: string;
   deviceSecret?: string;
   online: boolean;
+}
+
+export interface BulbSchedule {
+  _id: string;
+  bulb: Bulb | string;
+  block: string;
+  channel: number;
+  onTime: string;
+  offTime: string;
+  repeatPattern?: {
+    daysOfWeek: number[];
+  };
+  active: boolean;
 }
 
 export interface Schedule {
@@ -47,7 +69,15 @@ export interface EmergencyState {
   startedAt?: string;
 }
 
-export type EventLogType = 'bell_trigger' | 'emergency' | 'device_online' | 'device_offline' | 'error';
+export type EventLogType =
+  | 'bell_trigger'
+  | 'emergency'
+  | 'device_online'
+  | 'device_offline'
+  | 'error'
+  | 'bulb_on'
+  | 'bulb_off'
+  | 'bulb_toggle';
 
 export interface EventLog {
   _id: string;

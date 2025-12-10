@@ -6,6 +6,10 @@ import { ScheduleModel } from '../models/Schedule';
 import { deviceGateway } from '../websocket/deviceGateway';
 import { EventLogModel } from '../models/EventLog';
 import { OrganisationModel } from '../models/Organisation';
+import { BulbScheduleModel } from '../models/BulbSchedule';
+import { sendBulbState } from '../services/bulbControlService';
+import { BulbModel } from '../models/Bulb';
+import { logger } from '../config/logger';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -36,6 +40,50 @@ export const startScheduleRunner = () => {
           payload: { scheduleId: schedule._id },
         }).catch(() => undefined);
       });
+    }
+  });
+
+  cron.schedule('* * * * *', async () => {
+    const now = dayjs();
+    const day = now.day();
+
+    const bulbSchedules = await BulbScheduleModel.find({
+      active: true,
+      'repeatPattern.daysOfWeek': day,
+    });
+
+    for (const schedule of bulbSchedules) {
+      const org = await OrganisationModel.findById(schedule.organisation);
+      const tzNow = org ? now.tz(org.timezone) : now;
+      const hhmm = tzNow.format('HH:mm');
+
+      if (hhmm === schedule.onTime) {
+        try {
+          await sendBulbState(schedule.organisation.toString(), schedule.block.toString(), schedule.channel, true);
+          await BulbModel.findByIdAndUpdate(schedule.bulb, { state: true, lastToggledAt: new Date() }).catch(() => undefined);
+          await EventLogModel.create({
+            organisation: schedule.organisation,
+            type: 'bulb_on',
+            payload: { scheduleId: schedule._id, channel: schedule.channel, block: schedule.block },
+          }).catch(() => undefined);
+        } catch (err) {
+          logger.error('Failed to turn bulb on', err);
+        }
+      }
+
+      if (hhmm === schedule.offTime) {
+        try {
+          await sendBulbState(schedule.organisation.toString(), schedule.block.toString(), schedule.channel, false);
+          await BulbModel.findByIdAndUpdate(schedule.bulb, { state: false, lastToggledAt: new Date() }).catch(() => undefined);
+          await EventLogModel.create({
+            organisation: schedule.organisation,
+            type: 'bulb_off',
+            payload: { scheduleId: schedule._id, channel: schedule.channel, block: schedule.block },
+          }).catch(() => undefined);
+        } catch (err) {
+          logger.error('Failed to turn bulb off', err);
+        }
+      }
     }
   });
 };

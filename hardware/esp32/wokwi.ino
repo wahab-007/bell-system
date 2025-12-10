@@ -29,6 +29,7 @@ const uint16_t SERVER_WS_PORT = 443;
 #define USE_AES_PAYLOADS 0  // server expects plain sessionToken (no AES wrap)
 
 const int RELAY_PIN = 25;
+const int BULB_PINS[4] = {26, 27, 14, 12};
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 WebSocketsClient wsClient;
@@ -49,6 +50,7 @@ void connectWebsocket();
 void sendRegistration();
 void handleWsMessage(const String &message);
 void triggerRelay(int seconds);
+void setBulbChannel(int channel, bool state);
 void displayNextBell();
 int computeRemainingSeconds();
 
@@ -58,6 +60,10 @@ void setup() {
 
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  for (int i = 0; i < 4; i++) {
+    pinMode(BULB_PINS[i], OUTPUT);
+    digitalWrite(BULB_PINS[i], LOW);
+  }
 
   lcd.init();
   lcd.backlight();
@@ -395,6 +401,10 @@ void handleWsMessage(const String &message) {
       } else if (strcmp(event, "emergency_on") == 0) {
         triggerRelay(10);
         requestSession();  // refresh after emergency
+      } else if (strcmp(event, "bulb:set") == 0) {
+        int channel = data["channel"] | 1;
+        bool state = data["state"] | false;
+        setBulbChannel(channel, state);
       }
       return;
   }
@@ -443,6 +453,16 @@ void triggerRelay(int seconds) {
 
   lcd.clear();
   lcd.print("Idle");
+}
+
+void setBulbChannel(int channel, bool state) {
+  if (channel < 1 || channel > 4) return;
+  int pin = BULB_PINS[channel - 1];
+  digitalWrite(pin, state ? HIGH : LOW);
+  lcd.clear();
+  lcd.print("Bulb ");
+  lcd.print(channel);
+  lcd.print(state ? " ON" : " OFF");
 }
 
 void displayNextBell() {
