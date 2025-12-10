@@ -19,6 +19,16 @@ export const BulbsPage = () => {
   const { data: blocks = [] } = useFetch(fetchBlocks, []);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const dayMap: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const toDayNames = (days?: number[]) =>
+    (days ?? []).map((d) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d] || String(d)).join(', ');
+  const parseDays = (value: string) =>
+    value
+      .split(',')
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean)
+      .map((entry) => dayMap[entry] ?? Number(entry))
+      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
 
   const grouped = useMemo(() => {
     const map: Record<string, { block?: Block; bulbs: Bulb[]; schedules: Record<string, BulbSchedule[]> }> = {};
@@ -143,6 +153,8 @@ export const BulbsPage = () => {
                       onCreateSchedule={handleCreateSchedule}
                       onUpdateSchedule={handleUpdateSchedule}
                       onDeleteSchedule={handleDeleteSchedule}
+                      toDayNames={toDayNames}
+                      parseDays={parseDays}
                     />
                   ))}
               </div>
@@ -162,6 +174,8 @@ const BulbCard = ({
   onCreateSchedule,
   onUpdateSchedule,
   onDeleteSchedule,
+  toDayNames,
+  parseDays,
 }: {
   bulb: Bulb;
   schedules: BulbSchedule[];
@@ -171,11 +185,13 @@ const BulbCard = ({
   onCreateSchedule: (bulbId: string, payload: { onTime: string; offTime: string; daysOfWeek: number[] }) => Promise<void>;
   onUpdateSchedule: (scheduleId: string, payload: Partial<{ active: boolean }>) => Promise<void>;
   onDeleteSchedule: (scheduleId: string) => Promise<void>;
+  toDayNames: (days?: number[]) => string;
+  parseDays: (value: string) => number[];
 }) => {
   const [label, setLabel] = useState(bulb.label);
   const [onTime, setOnTime] = useState('07:00');
   const [offTime, setOffTime] = useState('18:00');
-  const [days, setDays] = useState('1,2,3,4,5');
+  const [days, setDays] = useState('mon,tue,wed,thu,fri');
 
   return (
     <div style={{ border: '1px solid #e4e7ec', borderRadius: 12, padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -229,7 +245,7 @@ const BulbCard = ({
               <strong>
                 {s.onTime} → {s.offTime}
               </strong>
-              <div style={{ color: '#667085', fontSize: 12 }}>Days: {s.repeatPattern?.daysOfWeek?.join(', ') || '—'}</div>
+              <div style={{ color: '#667085', fontSize: 12 }}>Days: {toDayNames(s.repeatPattern?.daysOfWeek) || '—'}</div>
             </div>
             <div style={{ display: 'flex', gap: '.35rem' }}>
               <button className="btn" disabled={savingId === s._id} onClick={() => onUpdateSchedule(s._id, { active: !s.active })}>
@@ -254,10 +270,7 @@ const BulbCard = ({
             onCreateSchedule(bulb._id, {
               onTime,
               offTime,
-              daysOfWeek: days
-                .split(',')
-                .map((v) => Number(v.trim()))
-                .filter((v) => !Number.isNaN(v)),
+              daysOfWeek: parseDays(days),
             })
           }
         >

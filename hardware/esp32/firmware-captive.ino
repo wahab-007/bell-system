@@ -10,6 +10,7 @@
 const char *DEVICE_ID = "esp-001";
 const char *DEVICE_SECRET = "espxyz098";            // must match server bell record
 const char *DEVICE_HMAC_SECRET = "39fhs873HJbas92"; // server env DEVICE_HMAC_SECRET
+const char *DEVICE_AES_SECRET  = "Abf93ns87hs9QNf2";  // 16 chars AES-128 key
 const char *SERVER_HOST = "https://bell-system-server.onrender.com";  // HTTP API base
 const char *SERVER_WS_HOST = "bell-system-server.onrender.com";       // WebSocket host (no protocol)
 const uint16_t SERVER_WS_PORT = 443;

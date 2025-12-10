@@ -8,7 +8,7 @@ import { MetricCard } from '../../components/dashboard/MetricCard';
 import { BellStatusList } from '../../components/dashboard/BellStatusList';
 import { ScheduleTimeline } from '../../components/dashboard/ScheduleTimeline';
 import { useFetch } from '../../hooks/useFetch';
-import { fetchBlocks, fetchBells, fetchSchedules } from '../../services/api';
+import { fetchBlocks, fetchBells, fetchBulbs, fetchSchedules } from '../../services/api';
 import { useAuthStore } from '../../state/useAuthStore';
 
 dayjs.extend(utc);
@@ -18,6 +18,7 @@ export const DashboardPage = () => {
   const { data: blocks = [] } = useFetch(fetchBlocks, []);
   const { data: bells = [] } = useFetch(fetchBells, []);
   const { data: schedules = [] } = useFetch(fetchSchedules, []);
+  const { data: bulbs = [] } = useFetch(fetchBulbs, []);
   const organisation = useAuthStore((s) => s.organisation);
 
   const nextBell = useMemo<string>(() => {
@@ -56,6 +57,7 @@ export const DashboardPage = () => {
       <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
         <MetricCard title="Blocks" value={String(blocks.length)} subtitle="Connected buildings" />
         <MetricCard title="Active Bells" value={String(bells.filter((bell) => bell.online).length)} subtitle="Online devices" />
+        <MetricCard title="Bulbs On" value={`${bulbs.filter((b) => b.state).length}/${bulbs.length || 0}`} subtitle="Lights currently on" />
         <MetricCard title="Schedules" value={String(schedules.length)} subtitle="Configured timings" />
         <MetricCard title="Next Bell" value={nextBell} subtitle="HH:MM" />
       </div>
