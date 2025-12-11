@@ -6,9 +6,9 @@ import { BulbScheduleModel } from '../models/BulbSchedule';
 
 export const ensureBlockBulbs = async (organisationId: string, blockId: string) => {
   const existing = await BulbModel.countDocuments({ organisation: organisationId, block: blockId });
-  if (existing >= 4) return;
+  if (existing >= 3) return;
   const docs = [];
-  for (let channel = 1; channel <= 4; channel++) {
+  for (let channel = 1; channel <= 3; channel++) {
     docs.push({
       organisation: organisationId,
       block: blockId,
