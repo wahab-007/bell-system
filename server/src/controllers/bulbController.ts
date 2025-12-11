@@ -8,6 +8,8 @@ import { ensureBlockBulbs, sendBulbState } from '../services/bulbControlService'
 import { EventLogModel } from '../models/EventLog';
 
 export const listBulbs = async (req: AuthRequest, res: Response) => {
+  // prune legacy channel-4 bulbs now that only 3 channels are supported
+  await BulbModel.deleteMany({ organisation: req.user!.organisationId, channel: { $gte: 4 } });
   const blocks = await BlockModel.find({ organisation: req.user!.organisationId });
   await Promise.all(blocks.map((block) => ensureBlockBulbs(req.user!.organisationId, block._id.toString())));
   const bulbs = await BulbModel.find({ organisation: req.user!.organisationId }).populate('block');
