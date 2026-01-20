@@ -6,6 +6,12 @@ export const AdminLogsPage = () => {
   const [logs, setLogs] = useState<EventLog[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const formatBell = (bell: EventLog['bell']) => {
+    if (!bell) return '-';
+    if (typeof bell === 'string') return bell;
+    return bell.label ?? bell._id;
+  };
+
   useEffect(() => {
     fetchAdminLogs(100)
       .then((res) => setLogs(res.data))
@@ -32,7 +38,7 @@ export const AdminLogsPage = () => {
               <tr key={log._id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                 <td>{log.type}</td>
                 <td>{log.organisation}</td>
-                <td>{log.bell ?? '-'}</td>
+                <td>{formatBell(log.bell)}</td>
                 <td>{new Date(log.timestamp).toLocaleString()}</td>
                 <td>
                   <code style={{ fontSize: 12 }}>{JSON.stringify(log.payload ?? {})}</code>
