@@ -8,12 +8,23 @@ import { HttpError } from '../middleware/errorHandler';
 import { createDeviceSession } from '../services/deviceSessionService';
 import { OrganisationModel } from '../models/Organisation';
 import { ScheduleModel } from '../models/Schedule';
+import { BellEventModel } from '../models/BellEvent';
+import { backfillSchedulesForEvent, ensureDefaultEvent } from '../services/bellEventService';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const findNextBellMinutes = async (organisationId: string, bellId: string, tz: string) => {
-  const schedules = await ScheduleModel.find({ organisation: organisationId, active: true, bells: bellId });
+  const defaultEvent = await ensureDefaultEvent(organisationId);
+  await backfillSchedulesForEvent(organisationId, defaultEvent._id.toString());
+  const activeEvent = await BellEventModel.findOne({ organisation: organisationId, active: true });
+  const eventId = activeEvent?._id ?? defaultEvent._id;
+  const schedules = await ScheduleModel.find({
+    organisation: organisationId,
+    active: true,
+    bells: bellId,
+    event: eventId,
+  });
   const now = dayjs().tz(tz);
   let best: dayjs.Dayjs | null = null;
 

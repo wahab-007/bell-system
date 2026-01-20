@@ -4,7 +4,9 @@ import type { Bell } from '../../types/api';
 
 interface Props {
   bells: Bell[];
+  eventId?: string;
   onSubmit: (payload: {
+    eventId?: string;
     name: string;
     bellIds: string[];
     time: string;
@@ -13,7 +15,7 @@ interface Props {
   }) => Promise<void>;
 }
 
-export const ScheduleForm = ({ bells, onSubmit }: Props) => {
+export const ScheduleForm = ({ bells, eventId, onSubmit }: Props) => {
   const [form, setForm] = useState({
     name: '',
     time: '08:00',
@@ -39,7 +41,7 @@ export const ScheduleForm = ({ bells, onSubmit }: Props) => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    await onSubmit({ ...form, bellIds: selectedBells });
+    await onSubmit({ ...form, bellIds: selectedBells, eventId });
     setLoading(false);
   };
 

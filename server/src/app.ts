@@ -16,7 +16,7 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
-    origin: env.corsOrigins.length ? env.corsOrigins : '*',
+    origin: env.corsOrigins.length ? env.corsOrigins : [env.dashboardUrl],
     credentials: true,
   }),
 );
@@ -29,12 +29,14 @@ if (env.nodeEnv !== 'test') {
   app.use(morgan('dev'));
 }
 
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    limit: 120,
-  }),
-);
+if (env.nodeEnv === 'production') {
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      limit: 120,
+    }),
+  );
+}
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/', (_req, res) => res.send('bell-system api running'));

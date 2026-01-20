@@ -20,10 +20,10 @@ const char *SERVER_HOST = "https://bell-system-server.onrender.com";   // HTTP A
 const char *SERVER_WS_HOST = "bell-system-server.onrender.com";        // WebSocket host (no protocol)
 const uint16_t SERVER_WS_PORT = 443;
 
-// Direct GPIO drive to Arduino level-shifter/relay bridge (3.3V -> 5V)
-// Using 3 bulb lines + 1 bell line (repurposed 4th channel)
-const int BELL_OUT_PIN = D0;              // GPIO16 -> Arduino bell input
-const int BULB_OUT_PINS[3] = {D5, D6, D7}; // Bulb1=B5(14), Bulb2=D6(12), Bulb3=D7(13)
+#include <SoftwareSerial.h>
+// Serial link to Arduino relay driver (TX only)
+const int ARDUINO_TX_PIN = D7; // GPIO13 -> Arduino RX
+SoftwareSerial relaySerial(-1, ARDUINO_TX_PIN); // RX unused, TX on D7
 
 // LCD pins (I2C): SDA=D2 (GPIO4), SCL=D1 (GPIO5)
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -34,11 +34,10 @@ const int SETUP_BTN = D3; // GPIO0 (ensure pull-up)
 WebSocketsClient wsClient;
 
 String sessionToken;
-int nextBellMinutes = -1;
-uint64_t nextBellTargetMs = 0;
-int lastShownSeconds = -2;
 bool socketConnected = false;
-bool bulbState[3] = {false, false, false};
+bool emergencyActive = false;
+bool bellOn = false;
+unsigned long lastSessionRefreshMs = 0;
 
 String hmac(String payload) {
   br_hmac_key_context kc;
@@ -63,8 +62,7 @@ void handleWsMessage(const String &message);
 void sendRegistration();
 void triggerRelay(int seconds);
 void setBulbChannel(int channel, bool state);
-void displayNextBell();
-int computeRemainingSeconds();
+void displayBellStatus();
 
 void configModeCallback(WiFiManager *wm) {
   lcd.clear();
@@ -81,13 +79,8 @@ void saveConfigCallback() {
 
 void setup() {
   Serial.begin(115200);
+  relaySerial.begin(9600); // TX only to Arduino
   pinMode(SETUP_BTN, INPUT_PULLUP);
-  pinMode(BELL_OUT_PIN, OUTPUT);
-  digitalWrite(BELL_OUT_PIN, LOW);
-  for (int i = 0; i < 3; i++) {
-    pinMode(BULB_OUT_PINS[i], OUTPUT);
-    digitalWrite(BULB_OUT_PINS[i], LOW);
-  }
 
   Wire.begin(D2, D1); // SDA, SCL
   lcd.begin();
@@ -132,10 +125,9 @@ void setup() {
 
 void loop() {
   wsClient.loop();
-  int remainingSec = computeRemainingSeconds();
-  if (remainingSec != lastShownSeconds) {
-    nextBellMinutes = (remainingSec >= 0) ? (remainingSec + 59) / 60 : -1;
-    displayNextBell();
+  // periodic session refresh to keep token alive (every 5 minutes) or after a failure
+  if ((millis() - lastSessionRefreshMs) > 300000) {
+    requestSession();
   }
 }
 
@@ -148,6 +140,7 @@ void requestSession() {
   if (!http.begin(client, url)) {
     lcd.clear();
     lcd.print("HTTP begin fail");
+    lastSessionRefreshMs = millis();
     return;
   }
 
@@ -168,20 +161,17 @@ void requestSession() {
     DynamicJsonDocument response(512);
     deserializeJson(response, http.getString());
     sessionToken = response["sessionToken"].as<String>();
-    nextBellMinutes = response["nextBell"]["minutes"] | -1;
-    if (nextBellMinutes >= 0) {
-      uint64_t nowMs = millis();
-      nextBellTargetMs = nowMs + (uint64_t)nextBellMinutes * 60000ULL;
-    } else {
-      nextBellTargetMs = 0;
-    }
     lcd.clear();
     lcd.print("Server linked");
-    displayNextBell();
+    displayBellStatus();
     if (socketConnected) sendRegistration();
+    lastSessionRefreshMs = millis();
   } else {
-    lcd.clear();
-    lcd.print("Auth failed");
+    // Log status for debugging; back off before retrying
+    Serial.print("Auth failed, status: ");
+    Serial.println(status);
+    // Keep current LCD content; don't overwrite with error
+    lastSessionRefreshMs = millis(); // retry after interval in loop
   }
   http.end();
 }
@@ -197,11 +187,13 @@ void onSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
       socketConnected = true;
-      displayNextBell();
+      bellOn = true; // consider circuit on when socket is up
+      displayBellStatus();
       Serial.println("WS connected");
       break;
     case WStype_DISCONNECTED:
       socketConnected = false;
+      bellOn = false;
       lcd.clear();
       lcd.print("Socket closed");
       Serial.println("WS disconnected");
@@ -260,7 +252,7 @@ void handleWsMessage(const String &message) {
     }
 
     if (strcmp(event, "device:ack") == 0) {
-      displayNextBell();
+      displayBellStatus();
       return;
     }
 
@@ -270,8 +262,18 @@ void handleWsMessage(const String &message) {
       Serial.println(duration);
       triggerRelay(duration);
     } else if (strcmp(event, "emergency_on") == 0) {
-      Serial.println("Emergency event");
-      triggerRelay(10);
+      Serial.println("Emergency event ON");
+      emergencyActive = true;
+      bellOn = true;
+      relaySerial.println("ON"); // latch bell on indefinitely
+      lcd.clear();
+      lcd.print("EMERGENCY ON");
+    } else if (strcmp(event, "emergency_off") == 0) {
+      Serial.println("Emergency event OFF");
+      emergencyActive = false;
+      relaySerial.println("OFF"); // stop bell
+      requestSession();
+      displayBellStatus();
     } else if (strcmp(event, "bulb:set") == 0) {
       int channel = data["channel"] | 1;
       bool state = data["state"] | false;
@@ -303,60 +305,42 @@ void sendRegistration() {
 
 void triggerRelay(int seconds) {
   lcd.clear();
-  lcd.print("Ringing ");
+  lcd.print("Bell ringing");
+  lcd.setCursor(0, 1);
   lcd.print(seconds);
   lcd.print("s");
-  digitalWrite(BELL_OUT_PIN, HIGH);
-  for (int i = seconds; i > 0; i--) {
-    lcd.setCursor(0, 1);
-    lcd.print("Left: ");
-    lcd.print(i);
-    lcd.print("s   ");
-    delay(1000);
-  }
-  digitalWrite(BELL_OUT_PIN, LOW);
-  requestSession();
-  displayNextBell();
+  bellOn = true;
+
+  // Send ring command to Arduino and reset next-bell tracking
+  relaySerial.print("RING ");
+  relaySerial.println(seconds);
+
+  // Show ring duration then refresh next bell
+  delay(seconds * 1000);
+  bellOn = true; // stay ON status after ring completes
+  displayBellStatus();
 }
 
 void setBulbChannel(int channel, bool state) {
   if (channel < 1 || channel > 3) return;
-  int idx = channel - 1;
-  bulbState[idx] = state;
-  digitalWrite(BULB_OUT_PINS[idx], state ? HIGH : LOW);
+  relaySerial.print("BULB ");
+  relaySerial.print(channel);
+  relaySerial.print(" ");
+  relaySerial.println(state ? "ON" : "OFF");
   lcd.clear();
   lcd.print("Bulb ");
   lcd.print(channel);
   lcd.print(state ? " ON" : " OFF");
   delay(5000);
-  displayNextBell();
+  displayBellStatus();
 }
 
-void displayNextBell() {
+void displayBellStatus() {
   lcd.clear();
-  int remainingSec = computeRemainingSeconds();
-  if (remainingSec > 0) {
-    int mins = remainingSec / 60;
-    int secs = remainingSec % 60;
-    lcd.print("Next in ");
-    lcd.print(mins);
-    lcd.print("m ");
-    if (secs < 10) lcd.print("0");
-    lcd.print(secs);
-    lastShownSeconds = remainingSec;
-  } else if (remainingSec == 0) {
-    lcd.print("Next in 0m 00");
-    lastShownSeconds = 0;
-  } else {
-    lcd.print(socketConnected ? "Socket online" : "Idle");
-    lastShownSeconds = -1;
+  lcd.print("Bell status: ");
+  lcd.setCursor(0, 1);
+  lcd.print(bellOn ? "ON " : "OFF");
+  if (emergencyActive) {
+    lcd.print(" EMERGENCY");
   }
-}
-
-int computeRemainingSeconds() {
-  if (nextBellTargetMs == 0) return -1;
-  uint64_t now = millis();
-  uint64_t remainingMs = (nextBellTargetMs > now) ? (nextBellTargetMs - now) : 0;
-  if (remainingMs == 0) return 0;
-  return (int)((remainingMs + 999ULL) / 1000ULL);
 }

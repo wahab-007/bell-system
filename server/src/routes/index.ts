@@ -9,6 +9,8 @@ import { profileRouter } from './profileRoutes';
 import { adminRouter } from './adminRoutes';
 import { bulbRouter } from './bulbRoutes';
 import { bulbScheduleRouter } from './bulbScheduleRoutes';
+import { bellEventRouter } from './bellEventRoutes';
+import { logRouter } from './logRoutes';
 
 export const apiRouter = Router();
 
@@ -18,6 +20,8 @@ apiRouter.use('/bells', bellRouter);
 apiRouter.use('/schedules', scheduleRouter);
 apiRouter.use('/bulbs', bulbRouter);
 apiRouter.use('/bulb-schedules', bulbScheduleRouter);
+apiRouter.use('/events', bellEventRouter);
+apiRouter.use('/logs', logRouter);
 apiRouter.use('/emergency', emergencyRouter);
 apiRouter.use('/device', deviceRouter);
 apiRouter.use('/profile', profileRouter);

@@ -4,6 +4,7 @@ export type ScheduleType = 'regular' | 'occasion';
 
 export interface ISchedule extends Document {
   organisation: mongoose.Types.ObjectId;
+  event?: mongoose.Types.ObjectId;
   bells: mongoose.Types.ObjectId[];
   name: string;
   time: string; // HH:mm
@@ -20,6 +21,7 @@ export interface ISchedule extends Document {
 const scheduleSchema = new Schema<ISchedule>(
   {
     organisation: { type: Schema.Types.ObjectId, ref: 'Organisation', required: true },
+    event: { type: Schema.Types.ObjectId, ref: 'BellEvent' },
     bells: [{ type: Schema.Types.ObjectId, ref: 'Bell', required: true }],
     name: { type: String, required: true },
     time: { type: String, required: true },

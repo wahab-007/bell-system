@@ -10,17 +10,32 @@ import { BulbScheduleModel } from '../models/BulbSchedule';
 import { sendBulbState } from '../services/bulbControlService';
 import { BulbModel } from '../models/Bulb';
 import { logger } from '../config/logger';
+import { BellEventModel } from '../models/BellEvent';
+import { backfillSchedulesForEvent, ensureDefaultEvent } from '../services/bellEventService';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export const startScheduleRunner = () => {
+  const seedDefaultEvents = async () => {
+    const orgs = await OrganisationModel.find().select('_id').lean();
+    for (const org of orgs) {
+      const defaultEvent = await ensureDefaultEvent(org._id.toString());
+      await backfillSchedulesForEvent(org._id.toString(), defaultEvent._id.toString());
+    }
+  };
+
+  seedDefaultEvents().catch((err) => logger.error('Failed to seed default events', err));
+
   cron.schedule('* * * * *', async () => {
     const now = dayjs();
     const day = now.day(); // 0-6
+    const activeEvents = await BellEventModel.find({ active: true }).select('_id').lean();
+    const activeEventIds = activeEvents.map((event) => event._id);
 
     const activeSchedules = await ScheduleModel.find({
       active: true,
+      event: { $in: activeEventIds },
       $or: [{ 'repeatPattern.daysOfWeek': day }, { type: 'occasion' }],
     }).populate('bells');
 

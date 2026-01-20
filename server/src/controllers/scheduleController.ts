@@ -5,16 +5,30 @@ import { AuthRequest } from '../middleware/auth';
 import { scheduleSchema, occasionSchema } from '../validators/scheduleValidators';
 import { HttpError } from '../middleware/errorHandler';
 import { OccasionModel } from '../models/Occasion';
+import { backfillSchedulesForEvent, ensureDefaultEvent } from '../services/bellEventService';
+import { BellEventModel } from '../models/BellEvent';
 
 export const listSchedules = async (req: AuthRequest, res: Response) => {
-  const schedules = await ScheduleModel.find({ organisation: req.user!.organisationId }).populate('bells');
+  const defaultEvent = await ensureDefaultEvent(req.user!.organisationId);
+  await backfillSchedulesForEvent(req.user!.organisationId, defaultEvent._id.toString());
+  const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+  const query = {
+    organisation: req.user!.organisationId,
+    ...(eventId ? { event: eventId } : {}),
+  };
+  const schedules = await ScheduleModel.find(query).populate('bells').populate('event', 'name active isDefault');
   res.json(schedules);
 };
 
 export const createSchedule = async (req: AuthRequest, res: Response) => {
   const data = scheduleSchema.parse(req.body);
+  const defaultEvent = await ensureDefaultEvent(req.user!.organisationId);
+  const eventId = data.eventId ?? defaultEvent._id.toString();
+  const event = await BellEventModel.findOne({ _id: eventId, organisation: req.user!.organisationId });
+  if (!event) throw new HttpError(404, 'Event not found for this organisation');
   const schedule = await ScheduleModel.create({
     organisation: req.user!.organisationId,
+    event: event._id,
     name: data.name,
     bells: data.bellIds,
     time: data.time,
@@ -30,12 +44,17 @@ export const createSchedule = async (req: AuthRequest, res: Response) => {
 
 export const updateSchedule = async (req: AuthRequest, res: Response) => {
   const data = scheduleSchema.partial().parse(req.body);
+  const update: Record<string, unknown> = { ...data };
+  delete update.eventId;
+  if (data.eventId) {
+    const event = await BellEventModel.findOne({ _id: data.eventId, organisation: req.user!.organisationId });
+    if (!event) throw new HttpError(404, 'Event not found for this organisation');
+    update.event = event._id;
+  }
+  if (data.daysOfWeek) update.repeatPattern = { daysOfWeek: data.daysOfWeek };
   const schedule = await ScheduleModel.findOneAndUpdate(
     { _id: req.params.id, organisation: req.user!.organisationId },
-    {
-      ...data,
-      repeatPattern: data.daysOfWeek ? { daysOfWeek: data.daysOfWeek } : undefined,
-    },
+    update,
     { new: true },
   );
   if (!schedule) throw new HttpError(404, 'Schedule not found');

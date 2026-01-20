@@ -10,6 +10,7 @@ import { UserModel } from '../models/User';
 import { hashPassword } from '../utils/password';
 import { HttpError } from '../middleware/errorHandler';
 import { slugify } from '../utils/slugify';
+import { ensureDefaultEvent } from '../services/bellEventService';
 
 export const adminHealth = async (_req: Request, res: Response) => {
   const dbState = mongoose.connection.readyState === 1 ? 'ok' : 'down';
@@ -151,8 +152,10 @@ export const createScheduleAdmin = async (req: Request, res: Response) => {
   if (!organisationId || !name || !time || !durationSec || !bellIds) {
     throw new HttpError(400, 'Missing required fields');
   }
+  const defaultEvent = await ensureDefaultEvent(organisationId);
   const schedule = await ScheduleModel.create({
     organisation: organisationId,
+    event: defaultEvent._id,
     name,
     time,
     durationSec,

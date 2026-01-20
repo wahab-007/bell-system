@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { BlocksPage } from './pages/blocks/BlocksPage';
 import { BellsPage } from './pages/bells/BellsPage';
 import { SchedulesPage } from './pages/schedules/SchedulesPage';
+import { EventSchedulesPage } from './pages/schedules/EventSchedulesPage';
 import { BulbsPage } from './pages/bulbs/BulbsPage';
 import { EmergencyPage } from './pages/emergency/EmergencyPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
@@ -57,6 +58,7 @@ function App() {
         <Route path="bulbs" element={<BulbsPage />} />
         <Route path="bells" element={<BellsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
+        <Route path="schedules/:eventId" element={<EventSchedulesPage />} />
         <Route path="emergency" element={<EmergencyPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>

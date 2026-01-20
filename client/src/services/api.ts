@@ -8,6 +8,7 @@ import type {
   Schedule,
   EmergencyState,
   EventLog,
+  BellEvent,
   Bulb,
   BulbSchedule,
 } from '../types/api';
@@ -90,6 +91,7 @@ export const createBellRequest = (payload: { label: string; blockId: string; dev
 export const updateScheduleRequest = (
   id: string,
   payload: Partial<{
+    eventId: string;
     name: string;
     bellIds: string[];
     time: string;
@@ -100,9 +102,33 @@ export const updateScheduleRequest = (
 ) => api.put<Schedule>(`/schedules/${id}`, payload);
 export const deleteScheduleRequest = (id: string) => api.delete(`/schedules/${id}`);
 
-export const fetchSchedules = () => api.get<Schedule[]>('/schedules');
-export const createScheduleRequest = (payload: Record<string, unknown>) =>
-  api.post<Schedule>('/schedules', payload);
+export const fetchSchedules = (eventId?: string) =>
+  api.get<Schedule[]>(eventId ? `/schedules?eventId=${eventId}` : '/schedules');
+export const createScheduleRequest = (payload: {
+  eventId?: string;
+  name: string;
+  bellIds: string[];
+  time: string;
+  durationSec: number;
+  daysOfWeek: number[];
+}) => api.post<Schedule>('/schedules', payload);
+
+export const fetchBellEvents = () => api.get<BellEvent[]>('/events');
+export const createBellEventRequest = (payload: { name: string; active?: boolean }) =>
+  api.post<BellEvent>('/events', payload);
+export const updateBellEventRequest = (id: string, payload: { name: string }) =>
+  api.put<BellEvent>(`/events/${id}`, payload);
+export const activateBellEventRequest = (id: string) => api.post<BellEvent>(`/events/${id}/activate`, {});
+export const deleteBellEventRequest = (id: string) => api.delete(`/events/${id}`);
+
+export const fetchOrgLogs = (payload: { limit?: number; type?: string; since?: string }) => {
+  const params = new URLSearchParams();
+  if (payload.limit) params.set('limit', String(payload.limit));
+  if (payload.type) params.set('type', payload.type);
+  if (payload.since) params.set('since', payload.since);
+  const suffix = params.toString();
+  return api.get<EventLog[]>(`/logs${suffix ? `?${suffix}` : ''}`);
+};
 
 export const fetchEmergencyState = () => api.get<EmergencyState>('/emergency');
 export const activateEmergencyRequest = () => api.post('/emergency/activate', {});

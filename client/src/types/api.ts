@@ -37,6 +37,13 @@ export interface Bell {
   online: boolean;
 }
 
+export interface BellEvent {
+  _id: string;
+  name: string;
+  active: boolean;
+  isDefault: boolean;
+}
+
 export interface BulbSchedule {
   _id: string;
   bulb: Bulb | string;
@@ -52,6 +59,7 @@ export interface BulbSchedule {
 
 export interface Schedule {
   _id: string;
+  event?: BellEvent | string;
   name: string;
   time: string;
   durationSec: number;
@@ -82,7 +90,7 @@ export type EventLogType =
 export interface EventLog {
   _id: string;
   organisation: string;
-  bell?: string;
+  bell?: Bell | string;
   type: EventLogType;
   payload?: Record<string, unknown>;
   timestamp: string;
